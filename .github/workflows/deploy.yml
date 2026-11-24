@@ -1,0 +1,49 @@
+name: Deploy Yougoo Website to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: 🚀 Build & Deploy VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Récupération du code
+        uses: actions/checkout@v4
+
+      - name: 📦 Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 🔨 Installation des dépendances
+        run: npm ci || npm install
+
+      - name: 🏗️ Compilation du projet (Vite)
+        run: npm run build
+
+      - name: 📂 Synchronisation des fichiers sur le serveur (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "dist/"
+          target: "/var/www/yougoo-website/dist/"
+          strip_components: 1
+
+      - name: 🔒 Mise à jour des permissions & rechargement Apache
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            chown -R www-data:www-data /var/www/yougoo-website/dist
+            chmod -R 755 /var/www/yougoo-website/dist
+            systemctl reload apache2
